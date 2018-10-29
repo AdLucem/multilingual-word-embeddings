@@ -3,14 +3,18 @@
 import json
 import random
 
-def random_dict():
+def get_dict():
 
-    datafile = "/home/kw/Assignments/multilingual-word-embeddings/data.json"
-    n = 100
+    dictfile = "../init_dict.json"
+    datafile = "../data.json"
+    n = 2000
 
     with open(datafile, "r+") as f:
         s = f.read()
         data = json.loads(s)
+    with open(dictfile, "r+") as f:
+        s = f.read()
+        d = json.loads(s)
 
     vo_en = data["vocab_english"]
     vo_hi = data["vocab_hindi"]
@@ -22,20 +26,6 @@ def random_dict():
     mat_en =  mat_en[:n]
     mat_hi =  mat_hi[:n]
 
-    d = []
-    for i in range(n):
-        subd = []
-        val = random.randint(1, n)
-        for j in range(n):
-            if j == (val - 1):
-                subd.append(1)
-            else:
-                subd.append(0)
-
-        d.append(subd)
-
     return d, vo_en, vo_hi, mat_en, mat_hi
-
-
 
 

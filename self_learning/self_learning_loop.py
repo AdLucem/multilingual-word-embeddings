@@ -1,5 +1,5 @@
 
-from sample_dict import random_dict
+from sample_dict import get_dict
 
 import json
 import numpy as np
@@ -10,7 +10,8 @@ num_iter = 100
 
 # vo: vocab, mat: matrix
 # d: dictionary in the format described in the paper
-d, vo_x, vo_z, mat_x, mat_z = random_dict()
+d, vo_x, vo_z, mat_x, mat_z = get_dict()
+
 
 def test_print_map(d):
     for index, ls in enumerate(d):
@@ -35,6 +36,8 @@ wx = np.random.rand(1, embedding_size)
 wz = np.random.rand(1, embedding_size)
 
 for i in range(num_iter):
+
+    print("Iteration " + str(i))
 
     # get optimal wx and wz
     m = (x.T.dot(d)).dot(z)
