@@ -1,2 +1,3 @@
-# multilingual-word-embeddings
-NLP Project: Multilingual word embeddings
+# Multilingual Word Embeddings
+
+NLP course project.
