@@ -39,6 +39,6 @@ for i in range(300):
     # append the trained model to the list of models
     models.append(reg)
 
+from joblib import dump, load
 
-for i in range(300):
-    print(models[i].coef_)
+dump(models, "model.joblib")

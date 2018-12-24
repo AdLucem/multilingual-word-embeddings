@@ -1,0 +1,132 @@
+#+TITLE: Supervised Mapping of Word Embeddings: Training
+
+# emdf, cl
+
+
+* Imports
+
+First, we'll import Word2Vec from gensim, and also a few utility libraries.
+
+#+NAME: imports
+#+BEGIN_SRC python
+ 
+from gensim.models import KeyedVectors
+import json
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import sys
+
+#+END_SRC
+
+
+* Training Using Linear Regression
+
+** Search Space
+
+Our search space is going to be a 300-dimensional vector space, since that's the dimensions of the word embeddings here. 
+
+The way we're going to visualize this problem is: imagine each embedding as a dot in this 300-dimensional space, where each dot corresponds to a word. There are two types of dots in this space- dots of our source language (French), and our target language (English).
+
+For each English dot, there is a corresponding French dot. Thus, there's a mapping M such that:
+
+M (English Dot) = Corresponding French Dot
+
+We're going to attempt to learn a linear function to approximate that mapping.
+
+** Dimensions Are Supposed To Mean Something, Right?  
+
+# TODO: check if I'm BSing this
+
+Theoretically the dimensions in a word enbedding are supposed to carry some information. Thus, if dimension =i= carries information about =feature i= for an English word, then dimension =i= is also supposed to carry information about the same =feature i= about the French word. In practise no one has (yet) managed to make the dimensions of neural word embeddings correspond to any kind of coherent feature set, but hope is eternal.
+
+So, our assumption here is that if we transform =feature i= for an English word by a set amount =x_i=, we can get something close to =feature i= for the corresponding French word.
+
+Therefore for each dimension, we create a separate linear regression model to predict the target value of that dimension from the source value.
+
+** 300 (Linear Transforms)
+
+Thus, our model is a set of models =(m1...m300)=. We train it to reduce the error between the transformed French dimension value and the corresponding English word's i'th dimension value.
+
+#+NAME: lin_reg_training
+#+BEGIN_SRC python 
+
+  # utility function to load data
+  def dataLoad(filename):
+      with open(filename, "r+") as f:
+          data = json.load(f)
+      return data
+
+  # load data
+  tr_en = dataLoad("eng_train.json")
+  tr_fr = dataLoad("fr_train.json")
+  tst_en = dataLoad("eng_test.json")
+  tst_fr = dataLoad("fr_test.json")
+
+  # strip training data to two lists of one-D values
+  vecs_en = list(map(lambda x: x[1], tr_en))
+  vecs_fr = list(map(lambda x: x[1], tr_fr))
+
+  models = []
+
+  # for each dimension
+  for i in range(300):
+
+      # initialize scikit-learn's linear regression model
+      reg = LinearRegression()
+
+      # fetch i'th dimension of all vectors
+      dim_fr = list(map(lambda x: [x[i]], vecs_fr))
+      dim_en = list(map(lambda x: [x[i]], vecs_en))
+
+      # train the model
+      reg.fit(dim_fr, dim_en)
+
+      # append the trained model to the list of models
+      models.append(reg)
+
+#+END_SRC
+
+To test if the function has successfully trained on the given data, we try to print the coefficients of the model:
+
+#+NAME: test_if_trained
+#+BEGIN_SRC python
+
+  for i in range(300):
+      print(models[i].coef_)
+#+END_SRC 
+
+A sample output:
+
+#+BEGIN_SRC
+[[-0.07425315]]
+[[0.10440188]]
+[[0.02270234]]
+[[0.04171708]]
+[[-0.0344679]]
+[[-0.0311099]]
+[[-0.01369972]]
+[[-0.13601571]]
+[[0.03493221]]
+[[-0.00065059]]
+[[0.03995712]]
+[[0.03190427]]
+#+END_SRC
+
+# TODO: wait, no bias?
+
+* Storing the Models
+
+#+NAME: storage
+#+BEGIN_SRC python
+  from joblib import dump, load
+
+  dump(models, "model.joblib")
+#+END_SRC
+
+* Tangling
+
+#+BEGIN_SRC python :eval no :noweb yes :tangle training.py
+<<imports>>
+<<lin_reg_training>>
+<<storage>>
+#+END_SRC
