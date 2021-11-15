@@ -1,0 +1,444 @@
+#+TITLE: A Naive Method For Supervised Mapping Of Word Embeddings
+
+* Logistics
+
+** Imports
+
+First, we'll import Word2Vec from gensim, and also a few utility libraries.
+
+#+NAME: imports
+#+BEGIN_SRC python 
+from gensim.models import KeyedVectors
+import json
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import sys
+
+#+END_SRC
+
+** Getting The Data
+
+We're also going to assume that the train and test data are already here, along with pretrained models for English and French word embeddings, in a subdirectory of the main directory of this project.
+
+
+I was originally going to do this only for Word2Vec because of lack of pretrained Fasttext models for a lot of languages, but then I discovered this glorious treasure trove of word embedding models in both Word2Vec and Fasttext:  https://github.com/Kyubyong/wordvectors
+
+And also pretrained models for English here: https://github.com/3Top/word2vec-api, linked by the same glorious soul that published the above set of models.
+
+So, we'll assume that the models- Word2Vec and fasttext- for English and French- are downloaded and in the =../data= directory. We're going to do this on the word2vec bin files first to see if they work. And like primitives, we hardcode the locations like so:
+
+#+NAME: data_location
+#+BEGIN_SRC python
+
+train_file = "../data/train.txt"
+test_file = "../data/test.txt"
+
+x_model_vec = "../data/GoogleNews-vectors-negative300.bin"
+y_model_vec = "../data/fr.vec"
+
+#+END_SRC
+
+* Reading in the data
+
+I'm paying attention to this because in my experience, input/output formatting and reading issues have been a major headache for me when actually implementing NLP applications. Taking a look at the train/test files, we see that they're like this:
+
+#+BEGIN_QUOTE
+es of
+les the
+est is
+est east
+une a
+#+END_QUOTE
+
+As in, each line has two strings, separated by whitespace, with the first string representing the French word and the second representing the English word for the same. The test file is the same format as the train file. 
+
+** Reading
+
+We read the data in like so: (this is the altered function, refer to the next subsection to see why I altered it)
+
+#+NAME: read_in_data
+#+BEGIN_SRC python
+
+  def read_data(filename):
+
+      with open(filename) as f:
+          s = f.readlines()
+      data = list(map(lambda x: x.rstrip("\n"), s))
+      data2 = list(map(lambda x: x.split(" "), data))
+      return data2
+
+  train_data = read_data(train_file)
+  test_data = read_data(test_file)
+#+END_SRC
+
+** Testing if it's read properly
+
+I'm also going to make a small test print function to see if the data's read in properly. (In this post I'm exposing /everything/ about the way I work, including the small details like test prints. Orgmode allows me to add and remove code blocks at will, so I can just put this here and then remove it as I move on with writing the program.)
+
+#+NAME: test_if_data_read
+#+BEGIN_SRC python
+  for i in range(3):
+      print(train_data[i])
+      print(test_data[i])
+#+END_SRC
+
+Aaaand the result is: 
+
+#+BEGIN_QUOTE
+['des', 'of\n']
+['kiev', 'kyiv\n']
+['les', 'the\n']
+['kiev', 'kiev\n']
+['est', 'is\n']
+['sac', 'bag\n']
+#+END_QUOTE
+
+** Stable Time Loop From The Future
+
+Whoops. I forgot to strip newlines. See, this is why I test print. Because everyone will inevitably forget details like this. So I go back and alter the function, forming a stable time loop (I just watched *Interstellar* okay), and...
+
+#+BEGIN_QUOTE
+['des', 'of']
+['kiev', 'kyiv']
+['les', 'the']
+['kiev', 'kiev']
+['est', 'is']
+['sac', 'bag']
+#+END_QUOTE
+
+Yay. Now I snip the test function codeblock from my code (emacs magic), and move on...
+
+* Words to Embeddings
+
+This is the part where we, er, convert words to vectors.
+
+** Loading Pretrained Models
+
+Loading the pretrained models using gensim:
+
+#+NAME: load_pretrained_models
+#+BEGIN_SRC python
+fr_model = KeyedVectors.load_word2vec_format(x_model_vec, binary=True)
+en_model = KeyedVectors.load_word2vec_format(y_model_vec, binary=False)
+#+END_SRC
+
+Now to see if they loaded, let's try getting embeddings for a few sample words from both languages:
+
+#+NAME: test_if_pretrained_models_loaded
+#+BEGIN_SRC python
+print(len(fr_model.wv["bag"]))
+print((len(en_model.wv["sac"])))
+#+END_SRC
+
+** Word Pairs to Vector Pairs
+
+A function to take a list of word pairs and convert them to a pair of (word, list) lists, put in a try/catch block because of words that may not be in the pretrained model's vocabulary throwing up errors:
+
+#+NAME: word_to_vector_pairs
+#+BEGIN_SRC python
+  def pairs2vec(ls):
+
+      en_vecs = []
+      fr_vecs = []
+      for i in ls:
+          try:
+              fr_word = i[0]
+              en_word = i[1]
+              fr_vec = fr_model.wv[fr_word]
+              en_vec = en_model.wv[en_word]
+              en_vecs.append((en_word, en_vec.tolist()))
+              fr_vecs.append((fr_word, fr_vec.tolist()))
+          except KeyError:
+              continue
+      return en_vecs, fr_vecs
+
+  train_en_vecs, train_fr_vecs = pairs2vec(train_data)
+  test_en_vecs, test_fr_vecs = pairs2vec(test_data)
+
+#+END_SRC
+
+And to test:
+
+#+NAME: test_pairs2vec
+#+BEGIN_SRC python
+
+  print(len(train_en_vecs[0]))
+  print(len(test_en_vecs[0]))
+
+#+END_SRC
+
+** Saving
+
+To stop the time-consuming process of loading the entire pretrained model every time I run this code, I'm saving the list of vector pairs in four files: =eng_train.json=, =fr_train.json=, =eng_test.json=, =fr_test.json=. Each file will have a list of (word, vector) pairs in JSON format.
+
+#+NAME: save_pairs2vec
+#+BEGIN_SRC python
+
+  def save_pairs2vec(vecs, filename):
+      with open(filename, "w+") as f:
+          json.dump(vecs, f)
+
+  save_pairs2vec(train_en_vecs, "eng_train.json")
+  save_pairs2vec(train_fr_vecs, "fr_train.json")
+  save_pairs2vec(test_en_vecs, "eng_test.json")
+  save_pairs2vec(test_fr_vecs, "fr_test.json")
+#+END_SRC
+
+* Training - Imports
+
+First, we'll import Word2Vec from gensim, and also a few utility libraries.
+
+#+NAME: imports
+#+BEGIN_SRC python
+ 
+from gensim.models import KeyedVectors
+import json
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import sys
+
+#+END_SRC
+
+* Training Using Linear Regression
+
+** Search Space
+
+Our search space is going to be a 300-dimensional vector space, since that's the dimensions of the word embeddings here. 
+
+The way we're going to visualize this problem is: imagine each embedding as a dot in this 300-dimensional space, where each dot corresponds to a word. There are two types of dots in this space- dots of our source language (French), and our target language (English).
+
+For each English dot, there is a corresponding French dot. Thus, there's a mapping M such that:
+
+M (English Dot) = Corresponding French Dot
+
+We're going to attempt to learn a linear function to approximate that mapping.
+
+** Dimensions Are Supposed To Mean Something, Right?  
+
+# TODO: check if I'm BSing this
+
+Theoretically the dimensions in a word enbedding are supposed to carry some information. Thus, if dimension =i= carries information about =feature i= for an English word, then dimension =i= is also supposed to carry information about the same =feature i= about the French word. In practise no one has (yet) managed to make the dimensions of neural word embeddings correspond to any kind of coherent feature set, but hope is eternal.
+
+So, our assumption here is that if we transform =feature i= for an English word by a set amount =x_i=, we can get something close to =feature i= for the corresponding French word.
+
+Therefore for each dimension, we create a separate linear regression model to predict the target value of that dimension from the source value.
+
+** 300 (Linear Transforms)
+
+Thus, our model is a set of models =(m1...m300)=. We train it to reduce the error between the transformed French dimension value and the corresponding English word's i'th dimension value.
+
+#+NAME: lin_reg_training
+#+BEGIN_SRC python 
+
+  # utility function to load data
+  def dataLoad(filename):
+      with open(filename, "r+") as f:
+          data = json.load(f)
+      return data
+
+  # load data
+  tr_en = dataLoad("eng_train.json")
+  tr_fr = dataLoad("fr_train.json")
+  tst_en = dataLoad("eng_test.json")
+  tst_fr = dataLoad("fr_test.json")
+
+  # strip training data to two lists of one-D values
+  vecs_en = list(map(lambda x: x[1], tr_en))
+  vecs_fr = list(map(lambda x: x[1], tr_fr))
+
+  models = []
+
+  # for each dimension
+  for i in range(300):
+
+      # initialize scikit-learn's linear regression model
+      reg = LinearRegression()
+
+      # fetch i'th dimension of all vectors
+      dim_fr = list(map(lambda x: [x[i]], vecs_fr))
+      dim_en = list(map(lambda x: [x[i]], vecs_en))
+
+      # train the model
+      reg.fit(dim_fr, dim_en)
+
+      # append the trained model to the list of models
+      models.append(reg)
+
+#+END_SRC
+
+To test if the function has successfully trained on the given data, we try to print the coefficients of the model:
+
+#+NAME: test_if_trained
+#+BEGIN_SRC python
+
+  for i in range(300):
+      print(models[i].coef_)
+#+END_SRC 
+
+A sample output:
+
+#+BEGIN_SRC
+[[-0.07425315]]
+[[0.10440188]]
+[[0.02270234]]
+[[0.04171708]]
+[[-0.0344679]]
+[[-0.0311099]]
+[[-0.01369972]]
+[[-0.13601571]]
+[[0.03493221]]
+[[-0.00065059]]
+[[0.03995712]]
+[[0.03190427]]
+#+END_SRC
+
+# TODO: wait, no bias?
+
+* Storing the Models
+
+#+NAME: storage
+#+BEGIN_SRC python
+  from joblib import dump, load
+
+  dump(models, "model.joblib")
+#+END_SRC
+
+* Testing - Imports
+
+First, we'll import Word2Vec from gensim, and also a few utility libraries.
+
+#+NAME: imports
+#+BEGIN_SRC python 
+from gensim.models import KeyedVectors
+import json
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.neighbors import NearestNeighbors
+import sys
+
+#+END_SRC
+
+We'll also import the =dataLoad= function from the =training= module.
+
+#+NAME: local_imports
+#+BEGIN_SRC python
+
+from training import dataLoad
+
+#+END_SRC
+
+* Load the Model
+
+Load the model (actually a list of models) from a joblib file.
+
+#+NAME: load_models
+#+BEGIN_SRC python
+
+  from joblib import dump, load
+
+  models = load("model.joblib")
+
+#+END_SRC
+
+* Testing
+
+Now we actually implement the model, by:
+
+(1) Finding the transform of the French source vector, according to the models trained.
+(2) In the vector space of possible result english words (taken from the english test corpus), find the word with the least distance from this transformed vector. In other words, find the nearest neighbour of this vector.
+(3) That word is the most likely translation of the root french word.
+
+This is a naive algorithm that takes a lot of time, but we're doing it first to see if it works.
+
+** Load The English Test Word Embeddings
+
+#+NAME: get_eng_embeddings
+#+BEGIN_SRC python
+  tst_en = dataLoad("eng_test.json")
+
+  # make a matrix of only the word embeddings
+  # and an associated list of vocabulary
+
+  en_vecs = []
+  en_words = []
+  for i in tst_en:
+      en_words.append(i[0])
+      en_vecs.append(i[1])
+
+#+END_SRC
+
+** Finding Transform of French Source Vector
+
+#+NAME: find_transform_of_fr
+#+BEGIN_SRC python
+
+
+  tst_fr = dataLoad("fr_test.json")
+
+  def find_transform(src):
+   
+      trans = []
+
+      # loop to transform it
+      for i in range(len(src)):
+          a = models[i].coef_[0][0]
+          b = models[i].intercept_[0]
+          x = src[i]
+          trans.append(a*x + b)
+
+      return trans
+
+#+END_SRC
+
+** Finding Nearest Neighbour of Transformed Vector
+
+#+NAME: nn_of_trans_vector
+#+BEGIN_SRC python 
+
+  def find_nn(trans):
+
+      nbrs = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(en_vecs)
+      distances, indices = nbrs.kneighbors([trans])
+
+      index = indices[0][0]
+
+      # remove that particular vector from the list
+      # because the algorithm as current causes ALL french vectors
+      # to translate to the english word 'collins'
+      en_vecs.pop(index)
+    
+      word = en_words[index]
+      return word
+#+END_SRC
+
+** Putting The Functions Together
+
+#+NAME: test_loop
+#+BEGIN_SRC python
+
+  pairs = []
+
+  for i in tst_fr:
+      pair = []
+
+      word = i[0]
+      vec = i[1]
+      pair.append(word)
+
+      # get the transform
+      trans = find_transform(vec)
+      # get the translated word
+      translation = find_nn(trans)
+
+      pair.append(translation)
+
+      pairs.append(pair)
+
+  # now write it to file
+  with open("results.json", "w+") as f:
+      json.dump(pairs, f)
+
+#+END_SRC
+
+
+

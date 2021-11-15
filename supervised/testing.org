@@ -1,7 +1,5 @@
 #+TITLE: Supervised Mapping of Word Embeddings: Testing
 
-# emdf, cl
-
 * Imports
 
 First, we'll import Word2Vec from gensim, and also a few utility libraries.

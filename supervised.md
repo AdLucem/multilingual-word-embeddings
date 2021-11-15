@@ -1,25 +1,20 @@
-#+TITLE: Supervised Mapping of Word Embeddings: Logistics
+# Naive Approach to Cross-Lingual Mapping of Word Embeddings
 
-* Logistics
-
-** Imports
+## Logistics
 
 First, we'll import Word2Vec from gensim, and also a few utility libraries.
 
-#+NAME: imports
-#+BEGIN_SRC python 
+```python
 from gensim.models import KeyedVectors
 import json
 import numpy as np
 from sklearn.linear_model import LinearRegression
 import sys
+```
 
-#+END_SRC
-
-** Getting The Data
+## Getting The Data
 
 We're also going to assume that the train and test data are already here, along with pretrained models for English and French word embeddings, in a subdirectory of the main directory of this project.
-
 
 I was originally going to do this only for Word2Vec because of lack of pretrained Fasttext models for a lot of languages, but then I discovered this glorious treasure trove of word embedding models in both Word2Vec and Fasttext:  https://github.com/Kyubyong/wordvectors
 
@@ -27,30 +22,14 @@ And also pretrained models for English here: https://github.com/3Top/word2vec-ap
 
 So, we'll assume that the models- Word2Vec and fasttext- for English and French- are downloaded and in the =../data= directory. We're going to do this on the word2vec bin files first to see if they work. And like primitives, we hardcode the locations like so:
 
-#+NAME: data_location
-#+BEGIN_SRC python
 
+```python
 train_file = "../data/train.txt"
 test_file = "../data/test.txt"
 
 x_model_vec = "../data/GoogleNews-vectors-negative300.bin"
 y_model_vec = "../data/fr.vec"
-
-#+END_SRC
-
-* Reading in the data
-
-I'm paying attention to this because in my experience, input/output formatting and reading issues have been a major headache for me when actually implementing NLP applications. Taking a look at the train/test files, we see that they're like this:
-
-#+BEGIN_QUOTE
-es of
-les the
-est is
-est east
-une a
-#+END_QUOTE
-
-As in, each line has two strings, separated by whitespace, with the first string representing the French word and the second representing the English word for the same. The test file is the same format as the train file. 
+```
 
 ** Reading
 
@@ -182,19 +161,4 @@ To stop the time-consuming process of loading the entire pretrained model every 
   save_pairs2vec(train_fr_vecs, "fr_train.json")
   save_pairs2vec(test_en_vecs, "eng_test.json")
   save_pairs2vec(test_fr_vecs, "fr_test.json")
-#+END_SRC
-
-Phew. That's the first laptop-frying part done.
-
-* Tangling
-
-** Data Logistics
-
-#+BEGIN_SRC python :eval no :noweb yes :tangle logistics.py
-<<imports>>
-<<data_location>>
-<<read_in_data>>
-<<load_pretrained_models>>
-<<word_to_vector_pairs>>
-<<save_pairs2vec>>
 #+END_SRC

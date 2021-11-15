@@ -1,7 +1,5 @@
 #+TITLE: Supervised Mapping of Word Embeddings: Training
 
-# emdf, cl
-
 
 * Imports
 
